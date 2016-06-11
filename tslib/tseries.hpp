@@ -83,6 +83,9 @@ namespace tslib {
     template<typename ReturnType, template<class> class F, template<class, template<typename> class> class PFUNC>
     const TSeries<TDATE,ReturnType,TSDIM,TSDATABACKEND,DatePolicy> time_window(const int n = 1) const;
 
+    template<typename ReturnType, template<class> class F, template<class, template<typename> class> class PFUNC>
+    const TSeries<TDATE,ReturnType,TSDIM,TSDATABACKEND,DatePolicy> time_window_OMP(const int n = 1) const;
+
     template<typename ReturnType, template<class> class F>
     const TSeries<TDATE,ReturnType,TSDIM,TSDATABACKEND,DatePolicy> transform() const;
 
@@ -465,6 +468,45 @@ namespace tslib {
 
     ReturnType* ans_data = ans.getData();
     TDATA* data = getData();
+    for(TSDIM ans_col = 0; ans_col < ans.ncol(); ans_col++, data+=nrow()) {
+      size_t range_start = 0;
+      for(size_t i = 0; i < ans_rows.size(); i++) {
+        ans_data[ans.offset(i, ans_col)] = F<ReturnType>::apply(data + range_start, data + ans_rows[i] + 1);
+        range_start = ans_rows[i] + 1;
+      }
+    }
+    return ans;
+  }
+
+  template<typename TDATE, typename TDATA, typename TSDIM, template<typename,typename,typename> class TSDATABACKEND, template<typename> class DatePolicy>
+  template<typename ReturnType, template<class> class F, template<class, template<typename> class> class PFUNC>
+  const TSeries<TDATE,ReturnType,TSDIM,TSDATABACKEND,DatePolicy> TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy>::time_window_OMP(const int n) const {
+    // pre-allocate vector for transformed dates
+    typename std::vector<TDATE> partitions;
+    partitions.resize(nrow());
+    TDATE* dts = getDates();
+    // transform dates
+    #pragma omp parallel for
+    for(TSDIM row = 0; row < nrow(); row++) {
+      partitions[row] = PFUNC<TDATE, DatePolicy>()(dts[row],n);
+    }
+    //std::transform(getDates(), getDates() + nrow(), partitions.begin(), std::bind2nd(PFUNC<TDATE, DatePolicy>(), n));
+    // vector for selected rows
+    std::vector<TSDIM> ans_rows;
+    breaks(partitions.begin(),partitions.end(),std::back_inserter(ans_rows));
+
+    TSeries<TDATE,ReturnType,TSDIM,TSDATABACKEND,DatePolicy> ans(ans_rows.size(), ncol());
+    ans.setColnames(getColnames());
+    TDATE* dates = getDates();
+    TDATE* ans_dates = ans.getDates();
+    #pragma omp parallel for
+    for(size_t i = 0; i < ans_rows.size(); i++) {
+      ans_dates[i] = dates[ans_rows[i]];
+    }
+
+    ReturnType* ans_data = ans.getData();
+    TDATA* data = getData();
+    #pragma omp parallel for collapse(2)
     for(TSDIM ans_col = 0; ans_col < ans.ncol(); ans_col++, data+=nrow()) {
       size_t range_start = 0;
       for(size_t i = 0; i < ans_rows.size(); i++) {
