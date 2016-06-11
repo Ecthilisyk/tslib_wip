@@ -24,6 +24,8 @@
 #include <boost/test/included/unit_test_framework.hpp>
 #include <boost/test/unit_test.hpp>
 
+#include <omp.h>
+
 #include <tslib/tseries.hpp>
 #include <tslib/tseries.io.hpp>
 #include <tslib/ts.opps/ts.opps.hpp>
