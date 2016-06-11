@@ -108,6 +108,12 @@ namespace tslib {
     const TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy> lead(const TSDIM n) const;
     const TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy> diff(const TSDIM n) const;
 
+    //// lag lead - OPENMP
+    const TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy> offset_OMP (const TSDIM n) const;
+    const TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy> lag_OMP(const TSDIM n) const;
+    const TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy> lead_OMP(const TSDIM n) const;
+    const TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy> diff_OMP(const TSDIM n) const;
+
     // matix index
     const TDATA operator() (const TSDIM row, const TSDIM col) const;
     TDATA& operator() (const TSDIM row, const TSDIM col);
@@ -169,6 +175,16 @@ namespace tslib {
   }
 
   template<typename TDATE, typename TDATA, typename TSDIM, template<typename,typename,typename> class TSDATABACKEND, template<typename> class DatePolicy>
+  const TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy> TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy>::offset_OMP (const TSDIM n) const {
+    if( n > 0 ) {
+      return lag_OMP(n);
+    } else if( n < 0) {
+      return lead_OMP(abs(n));
+    }
+    return *this;
+  }
+
+  template<typename TDATE, typename TDATA, typename TSDIM, template<typename,typename,typename> class TSDATABACKEND, template<typename> class DatePolicy>
   const TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy> TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy>::lag(const TSDIM n) const {
     if(n >= nrow()) { throw std::logic_error("lag: n > nrow of time series."); }
     const TSDIM new_size = nrow() - n;
@@ -191,6 +207,31 @@ namespace tslib {
   }
 
   template<typename TDATE, typename TDATA, typename TSDIM, template<typename,typename,typename> class TSDATABACKEND, template<typename> class DatePolicy>
+  const TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy> TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy>::lag_OMP(const TSDIM n) const {
+    if(n >= nrow()) { throw std::logic_error("lag: n > nrow of time series."); }
+    const TSDIM new_size = nrow() - n;
+    TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy> ans(new_size, ncol());
+    TDATA* ans_data = ans.getData();
+    const TDATA* data = getData();
+
+    TSDIM t_nrow = nrow();
+    TSDIM t_ans_nrow = ans.nrow();
+
+    // copy over dates
+    std::copy(getDates() + n, getDates() + n + new_size, ans.getDates());
+
+    // set new colnames
+    ans.setColnames(getColnames());
+
+    #pragma omp parallel for
+    for(TSDIM c = 0; c < ncol(); c++){
+      std::copy(data + t_nrow * c, data + t_nrow * c + new_size, ans_data + t_ans_nrow * c);
+    }
+
+    return ans;
+  }
+
+  template<typename TDATE, typename TDATA, typename TSDIM, template<typename,typename,typename> class TSDATABACKEND, template<typename> class DatePolicy>
   const TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy> TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy>::lead(const TSDIM n) const {
     if(n >= nrow()) { throw std::logic_error("lead: n > nrow of time series."); }
     const TSDIM new_size = nrow() - n;
@@ -208,6 +249,30 @@ namespace tslib {
       std::copy(data + n, data + n + new_size, ans_data);
       ans_data += ans.nrow();
       data += nrow();
+    }
+    return ans;
+  }
+
+  template<typename TDATE, typename TDATA, typename TSDIM, template<typename,typename,typename> class TSDATABACKEND, template<typename> class DatePolicy>
+  const TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy> TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy>::lead_OMP(const TSDIM n) const {
+    if(n >= nrow()) { throw std::logic_error("lead: n > nrow of time series."); }
+    const TSDIM new_size = nrow() - n;
+    TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy> ans(new_size, ncol());
+    TDATA* ans_data = ans.getData();
+    const TDATA* data = getData();
+
+    TSDIM t_nrow = nrow();
+    TSDIM t_ans_nrow = ans.nrow();
+
+    // copy over dates
+    std::copy(getDates(), getDates() + new_size, ans.getDates());
+
+    // set new colnames
+    ans.setColnames(getColnames());
+
+    #pragma omp parallel for
+    for(TSDIM c = 0; c < ncol(); c++){
+      std::copy(data + t_nrow*c + n, data + t_nrow*c + n + new_size, ans_data + t_ans_nrow * c);
     }
     return ans;
   }
@@ -240,6 +305,35 @@ namespace tslib {
     return ans;
   }
 
+  template<typename TDATE, typename TDATA, typename TSDIM, template<typename,typename,typename> class TSDATABACKEND, template<typename> class DatePolicy>
+  const TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy> TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy>::diff_OMP(const TSDIM n) const {
+    if(n >= nrow()) { throw std::logic_error("diff: n > nrow of time series."); }
+    const TSDIM new_size = nrow() - n;
+    TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy> ans(new_size, ncol());
+    TDATA* ans_data = ans.getData();
+    const TDATA* data = getData();
+
+    TSDIM t_nrow = nrow();
+    TSDIM t_ans_nrow = ans.nrow();
+
+    // copy over dates
+    std::copy(getDates() + n, getDates() + n + new_size, ans.getDates());
+
+    // set new colnames
+    ans.setColnames(getColnames());
+
+    #pragma omp parallel for collapse(2)
+    for(TSDIM c = 0; c < ncol(); c++) {
+      for(TSDIM r = n; r < nrow(); r++) {
+        if(numeric_traits<TDATA>::ISNA(data[r]) || numeric_traits<TDATA>::ISNA(data[r-n])) {
+          ans_data[r-n + c*t_ans_nrow] = numeric_traits<TDATA>::NA();
+        } else {
+          ans_data[r-n + c*t_ans_nrow] = data[r + t_nrow] - data[r-n + t_nrow];
+        }
+      }
+    }
+    return ans;
+  }
 
   template<typename TDATE, typename TDATA, typename TSDIM, template<typename,typename,typename> class TSDATABACKEND, template<typename> class DatePolicy>
   const TDATA TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy>::operator() (const TSDIM row, const TSDIM col) const {

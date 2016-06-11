@@ -1,6 +1,6 @@
 INSTALL_DIR=/usr/include
 
-CFLAGS = -Wall -O0 -g -fpic
+CFLAGS = -I ~/boost_1_61_0 -Wall -O0 -g -fpic -fopenmp -std=c++11 
 CXXFLAGS = $(CFLAGS)
 LDFLAGS =
 CXX      = g++

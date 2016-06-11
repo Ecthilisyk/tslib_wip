@@ -862,48 +862,90 @@ void time_window_test_second() {
   cout << sum_ans3 << endl;
 }
 
+void omp_comp(){
+
+  int nc = 500;
+  int nr = 500;
+  LDL_ts x(nr, nc);
+  long temp1[nr * nc];
+
+  double t1 = 0;
+  double t2 = 0;
+
+  t1 = omp_get_wtime();
+  for(long vi = 0; vi < x.nrow()*x.ncol(); vi++)
+    x.getData()[vi] = vi+1;
+  for(long xi = 0; xi < x.nrow(); xi++)
+    x.getDates()[xi] = xi+1;
+  cout << "original" << endl;
+  cout << x << endl;
+  LDL_ts ans_lag = x(1);
+  LDL_ts ans_lead = x(-1);
+  LDL_ts ans_diff(x.diff(1));
+
+  t2 = omp_get_wtime();
+  cout<<"regular initialization is :  "<< t2 - t1 <<" s "<<endl;
+
+  t1 = omp_get_wtime();
+  #pragma omp parallel for
+  for(long vi = 0; vi < x.nrow()*x.ncol(); vi++)
+    x.getData()[vi] = vi+1;
+  #pragma omp parallel for
+  for(long xi = 0; xi < x.nrow(); xi++)
+    x.getDates()[xi] = xi+1;
+
+  ans_lag = x.offset_OMP(1);
+  ans_lead = x.offset_OMP(-1);
+  ans_diff = x.diff_OMP(1);
+
+  t2 = omp_get_wtime();
+  cout<<"OMP initialization is :  "<< t2 - t1 <<" s "<<endl;
+}
+
 test_suite*
 init_unit_test_suite( int argc, char* argv[] ) {
 
   test_suite* test= BOOST_TEST_SUITE("tslib test");
 
-  test->add( BOOST_TEST_CASE( &null_constructor_test ) );
-  test->add( BOOST_TEST_CASE( &std_constructor_test ) );
-  test->add( BOOST_TEST_CASE( &tsdata_constructor_test) );
-  test->add( BOOST_TEST_CASE( &external_data_constructor_test) );
-  test->add( BOOST_TEST_CASE( &set_colnames_test ) );
-  test->add( BOOST_TEST_CASE( &range_specifier_test ) );
-  test->add( BOOST_TEST_CASE( &operators_test ) );
-  test->add( BOOST_TEST_CASE( &mixed_operators_test ) );
-  test->add( BOOST_TEST_CASE( &assignment_test ) );
-  test->add( BOOST_TEST_CASE( &vector_window_apply_test ) );
-  test->add( BOOST_TEST_CASE( &window_apply_test ) );
-  test->add( BOOST_TEST_CASE( &lag_lead_test ) );
-  test->add( BOOST_TEST_CASE( &diff_test ) );
-  test->add( BOOST_TEST_CASE( &posix_date_test ) );
-  test->add( BOOST_TEST_CASE( &vector_transform_test ) );
-  test->add( BOOST_TEST_CASE( &vector_ema_test ) );
-  test->add( BOOST_TEST_CASE( &transform_test ) );
-  test->add( BOOST_TEST_CASE( &window_function_test ) );
-  test->add( BOOST_TEST_CASE( &expanding_max_test ) );
-  test->add( BOOST_TEST_CASE( &pad_test ) );
+  test->add( BOOST_TEST_CASE( &omp_comp ) );
 
-  test->add( BOOST_TEST_CASE( &time_window_test_month ) );
-  test->add( BOOST_TEST_CASE( &time_window_test_day ) );
-  test->add( BOOST_TEST_CASE( &time_window_test_hour ) );
-  test->add( BOOST_TEST_CASE( &time_window_test_minute ) );
-  test->add( BOOST_TEST_CASE( &time_window_test_second ) );
+  // test->add( BOOST_TEST_CASE( &null_constructor_test ) );
+  // test->add( BOOST_TEST_CASE( &std_constructor_test ) );
+  // test->add( BOOST_TEST_CASE( &tsdata_constructor_test) );
+  // test->add( BOOST_TEST_CASE( &external_data_constructor_test) );
+  // test->add( BOOST_TEST_CASE( &set_colnames_test ) );
+  // test->add( BOOST_TEST_CASE( &range_specifier_test ) );
+  // test->add( BOOST_TEST_CASE( &operators_test ) );
+  // test->add( BOOST_TEST_CASE( &mixed_operators_test ) );
+  // test->add( BOOST_TEST_CASE( &assignment_test ) );
+  // test->add( BOOST_TEST_CASE( &vector_window_apply_test ) );
+  // test->add( BOOST_TEST_CASE( &window_apply_test ) );
+  // test->add( BOOST_TEST_CASE( &lag_lead_test ) );
+  // test->add( BOOST_TEST_CASE( &diff_test ) );
+  // test->add( BOOST_TEST_CASE( &posix_date_test ) );
+  // test->add( BOOST_TEST_CASE( &vector_transform_test ) );
+  // test->add( BOOST_TEST_CASE( &vector_ema_test ) );
+  // test->add( BOOST_TEST_CASE( &transform_test ) );
+  // test->add( BOOST_TEST_CASE( &window_function_test ) );
+  // test->add( BOOST_TEST_CASE( &expanding_max_test ) );
+  // test->add( BOOST_TEST_CASE( &pad_test ) );
 
-  test->add( BOOST_TEST_CASE( &cbind_test ) );
+  // test->add( BOOST_TEST_CASE( &time_window_test_month ) );
+  // test->add( BOOST_TEST_CASE( &time_window_test_day ) );
+  // test->add( BOOST_TEST_CASE( &time_window_test_hour ) );
+  // test->add( BOOST_TEST_CASE( &time_window_test_minute ) );
+  // test->add( BOOST_TEST_CASE( &time_window_test_second ) );
 
-  test->add( BOOST_TEST_CASE( &freq_conv_test_year ) );
-  test->add( BOOST_TEST_CASE( &freq_conv_test_quarter ) );
-  test->add( BOOST_TEST_CASE( &freq_conv_test_month ) );
-  test->add( BOOST_TEST_CASE( &freq_conv_test_week ) );
-  test->add( BOOST_TEST_CASE( &freq_conv_test_day ) );
-  test->add( BOOST_TEST_CASE( &freq_conv_test_hour ) );
-  test->add( BOOST_TEST_CASE( &freq_conv_test_minute ) );
-  test->add( BOOST_TEST_CASE( &freq_conv_test_second ) );
+  // test->add( BOOST_TEST_CASE( &cbind_test ) );
+
+  // test->add( BOOST_TEST_CASE( &freq_conv_test_year ) );
+  // test->add( BOOST_TEST_CASE( &freq_conv_test_quarter ) );
+  // test->add( BOOST_TEST_CASE( &freq_conv_test_month ) );
+  // test->add( BOOST_TEST_CASE( &freq_conv_test_week ) );
+  // test->add( BOOST_TEST_CASE( &freq_conv_test_day ) );
+  // test->add( BOOST_TEST_CASE( &freq_conv_test_hour ) );
+  // test->add( BOOST_TEST_CASE( &freq_conv_test_minute ) );
+  // test->add( BOOST_TEST_CASE( &freq_conv_test_second ) );
 
   return test;
 }
