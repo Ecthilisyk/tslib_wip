@@ -77,6 +77,9 @@ namespace tslib {
     template<typename ReturnType, template<class> class F>
     const TSeries<TDATE,ReturnType,TSDIM,TSDATABACKEND,DatePolicy> window(const size_t window) const;
 
+    template<typename ReturnType, template<class> class F>
+    const TSeries<TDATE,ReturnType,TSDIM,TSDATABACKEND,DatePolicy> window_OMP(const size_t window) const;
+
     template<typename ReturnType, template<class> class F, template<class, template<typename> class> class PFUNC>
     const TSeries<TDATE,ReturnType,TSDIM,TSDATABACKEND,DatePolicy> time_window(const int n = 1) const;
 
@@ -409,6 +412,30 @@ namespace tslib {
       ans_data += ans.nrow();
       data += nrow();
     }
+    return ans;
+  }
+
+  template<typename TDATE, typename TDATA, typename TSDIM, template<typename,typename,typename> class TSDATABACKEND, template<typename> class DatePolicy>
+  template<typename ReturnType, template<class> class F>
+  const TSeries<TDATE,ReturnType,TSDIM,TSDATABACKEND,DatePolicy> TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy>::window_OMP(const size_t window) const {
+
+    // allocate new answer
+    TSeries<TDATE,ReturnType,TSDIM,TSDATABACKEND,DatePolicy> ans(nrow() - (window - 1), ncol());
+
+    // copy over dates
+    std::copy(getDates() + (window - 1), getDates()+nrow(), ans.getDates());
+
+    // set new colnames
+    ans.setColnames(getColnames());
+
+    ReturnType* ans_data = ans.getData();
+    TDATA* data = getData();
+
+    #pragma omp parallel for
+    for(TSDIM col = 0; col < ncol(); col++) {
+      windowApply<ReturnType,F>::apply(ans_data + ans.nrow()*col , data + nrow()*col, data + nrow() + nrow()*col, window);
+    }
+
     return ans;
   }
 

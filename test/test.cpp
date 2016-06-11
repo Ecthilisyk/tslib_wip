@@ -372,7 +372,7 @@ void window_apply_test() {
   typedef rankTraits<double>::ReturnType rank_ansType;
 
   long xnr = 50;
-  long xnc = 5;
+  long xnc = 50;
 
   LDL_ts x(xnr,xnc);
 
@@ -391,6 +391,37 @@ void window_apply_test() {
   BOOST_CHECK_EQUAL(sum_ans.getData()[0],(5.0*6.0)/2.0);
 
   TSeries<long,rank_ansType,long,TSdataSingleThreaded,PosixDate> rank_ans = x.window<rank_ansType,Rank>(5);
+  BOOST_CHECK_EQUAL(rank_ans.getData()[0],5);
+}
+
+void window_apply_test_OMP() {
+  // define our answer type
+  typedef meanTraits<double>::ReturnType mean_ansType;
+  typedef sumTraits<double>::ReturnType sum_ansType;
+  typedef rankTraits<double>::ReturnType rank_ansType;
+
+  long xnr = 50;
+  long xnc = 50;
+
+  LDL_ts x(xnr,xnc);
+
+  // gernate data
+  #pragma omp parallel for
+  for(long vi = 0; vi < x.nrow()*x.ncol(); vi++)
+    x.getData()[vi] = vi+1;
+
+  // generate dates
+  #pragma omp parallel for
+  for(long xi = 0; xi < x.nrow(); xi++)
+    x.getDates()[xi] = xi+1;
+
+  TSeries<long,mean_ansType,long,TSdataSingleThreaded,PosixDate> mean_ans = x.window_OMP<mean_ansType,Mean>(5);
+  BOOST_CHECK_EQUAL(mean_ans.getData()[0],3);
+
+  TSeries<long,sum_ansType,long,TSdataSingleThreaded,PosixDate> sum_ans = x.window_OMP<sum_ansType,Sum>(5);
+  BOOST_CHECK_EQUAL(sum_ans.getData()[0],(5.0*6.0)/2.0);
+
+  TSeries<long,rank_ansType,long,TSdataSingleThreaded,PosixDate> rank_ans = x.window_OMP<rank_ansType,Rank>(5);
   BOOST_CHECK_EQUAL(rank_ans.getData()[0],5);
 }
 
@@ -862,7 +893,7 @@ void time_window_test_second() {
   cout << sum_ans3 << endl;
 }
 
-void omp_comp(){
+void omp_comp_initialization(){
 
   int nc = 500;
   int nr = 500;
@@ -877,8 +908,7 @@ void omp_comp(){
     x.getData()[vi] = vi+1;
   for(long xi = 0; xi < x.nrow(); xi++)
     x.getDates()[xi] = xi+1;
-  cout << "original" << endl;
-  cout << x << endl;
+
   LDL_ts ans_lag = x(1);
   LDL_ts ans_lead = x(-1);
   LDL_ts ans_diff(x.diff(1));
@@ -902,12 +932,30 @@ void omp_comp(){
   cout<<"OMP initialization is :  "<< t2 - t1 <<" s "<<endl;
 }
 
+void omp_comp_window_apply(){
+
+  double t1 = 0;
+  double t2 = 0;
+
+  t1 = omp_get_wtime();
+  window_apply_test();
+  t2 = omp_get_wtime();
+  cout<<"regular version is :  "<< t2 - t1 <<" s "<<endl;
+
+  t1 = omp_get_wtime();
+  window_apply_test_OMP();
+  t2 = omp_get_wtime();
+  cout<<"omp version is :  "<< t2 - t1 <<" s "<<endl;
+}
+
 test_suite*
 init_unit_test_suite( int argc, char* argv[] ) {
 
   test_suite* test= BOOST_TEST_SUITE("tslib test");
 
-  test->add( BOOST_TEST_CASE( &omp_comp ) );
+  test->add( BOOST_TEST_CASE( &omp_comp_window_apply ) );
+
+  test->add( BOOST_TEST_CASE( &omp_comp_initialization ) );
 
   // test->add( BOOST_TEST_CASE( &null_constructor_test ) );
   // test->add( BOOST_TEST_CASE( &std_constructor_test ) );
