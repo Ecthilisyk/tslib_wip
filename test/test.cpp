@@ -804,9 +804,28 @@ void time_window_test_month() {
   for(int i = 0; i < x.nrow(); i++) { x.getDates()[i] = i * 60*60*24; }
   std::fill(x.getData(), x.getData() + x.nrow() * x.ncol(), 1.0);
 
-  DDL_ts sum_ans = x.time_window<sum_ansType,Sum,yyyymm>();
+  DDL_ts sum_ans = x.time_window<sum_ansType,Sum,yyyymm>(2);
 
   cout << "months:" << endl;
+  cout << sum_ans << endl;
+}
+
+void time_window_test_month_OMP() {
+  // define our answer type
+  typedef sumTraits<double>::ReturnType sum_ansType;
+
+  long xnr = 500;
+  long xnc = 5;
+
+  DDL_ts x(xnr,xnc);
+
+  // generate dates/data
+  for(int i = 0; i < x.nrow(); i++) { x.getDates()[i] = i * 60*60*24; }
+  std::fill(x.getData(), x.getData() + x.nrow() * x.ncol(), 1.0);
+
+  DDL_ts sum_ans = x.time_window_OMP<sum_ansType,Sum,yyyymm>(2);
+
+  cout << "months_OMP:" << endl;
   cout << sum_ans << endl;
 }
 
@@ -937,13 +956,37 @@ void omp_comp_window_apply(){
   double t1 = 0;
   double t2 = 0;
 
+  int n_repeat = 1000;
+
   t1 = omp_get_wtime();
-  window_apply_test();
+  for(int i = 0; i < n_repeat; i++)
+  {
+      window_apply_test();
+  }
   t2 = omp_get_wtime();
   cout<<"regular version is :  "<< t2 - t1 <<" s "<<endl;
 
   t1 = omp_get_wtime();
-  window_apply_test_OMP();
+  for(int i = 0; i < n_repeat; i++)
+  {
+    window_apply_test_OMP();
+  }
+  t2 = omp_get_wtime();
+  cout<<"omp version is :  "<< t2 - t1 <<" s "<<endl;
+}
+
+void omp_comp_window_apply_month(){
+
+  double t1 = 0;
+  double t2 = 0;
+
+  t1 = omp_get_wtime();
+  time_window_test_month();
+  t2 = omp_get_wtime();
+  cout<<"regular version is :  "<< t2 - t1 <<" s "<<endl;
+
+  t1 = omp_get_wtime();
+  time_window_test_month_OMP();
   t2 = omp_get_wtime();
   cout<<"omp version is :  "<< t2 - t1 <<" s "<<endl;
 }
@@ -954,8 +997,8 @@ init_unit_test_suite( int argc, char* argv[] ) {
   test_suite* test= BOOST_TEST_SUITE("tslib test");
 
   test->add( BOOST_TEST_CASE( &omp_comp_window_apply ) );
-
   test->add( BOOST_TEST_CASE( &omp_comp_initialization ) );
+  test->add( BOOST_TEST_CASE( &omp_comp_window_apply_month ) );
 
   // test->add( BOOST_TEST_CASE( &null_constructor_test ) );
   // test->add( BOOST_TEST_CASE( &std_constructor_test ) );

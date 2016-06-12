@@ -506,12 +506,12 @@ namespace tslib {
 
     ReturnType* ans_data = ans.getData();
     TDATA* data = getData();
-    #pragma omp parallel for collapse(2)
-    for(TSDIM ans_col = 0; ans_col < ans.ncol(); ans_col++, data+=nrow()) {
-      size_t range_start = 0;
+    // #pragma omp parallel for collapse(2)
+    for(TSDIM ans_col = 0; ans_col < ans.ncol(); ans_col++) {
+      // size_t range_start = 0;
       for(size_t i = 0; i < ans_rows.size(); i++) {
-        ans_data[ans.offset(i, ans_col)] = F<ReturnType>::apply(data + range_start, data + ans_rows[i] + 1);
-        range_start = ans_rows[i] + 1;
+        ans_data[ans.offset(i, ans_col)] = F<ReturnType>::apply(data + nrow()*ans_col + (i>0)*(ans_rows[i-1] + 1), data + nrow()*ans_col + ans_rows[i] + 1);
+        // range_start = ans_rows[i] + 1;
       }
     }
     return ans;
