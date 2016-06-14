@@ -1029,9 +1029,9 @@ init_unit_test_suite( int argc, char* argv[] ) {
 
   // test->add( BOOST_TEST_CASE( &cbind_test ) );
 
-  // test->add( BOOST_TEST_CASE( &freq_conv_test_year ) );
-  // test->add( BOOST_TEST_CASE( &freq_conv_test_quarter ) );
-  // test->add( BOOST_TEST_CASE( &freq_conv_test_month ) );
+  test->add( BOOST_TEST_CASE( &freq_conv_test_year ) );
+  test->add( BOOST_TEST_CASE( &freq_conv_test_quarter ) );
+  test->add( BOOST_TEST_CASE( &freq_conv_test_month ) );
   // test->add( BOOST_TEST_CASE( &freq_conv_test_week ) );
   // test->add( BOOST_TEST_CASE( &freq_conv_test_day ) );
   // test->add( BOOST_TEST_CASE( &freq_conv_test_hour ) );

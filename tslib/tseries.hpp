@@ -676,7 +676,7 @@ namespace tslib {
 
     #pragma omp parallel
     {
-      #pragma omp single no wait
+      #pragma omp single nowait
       {
         while(beg!=end) {
           #pragma omp task firstprivate(beg, ans_index)
