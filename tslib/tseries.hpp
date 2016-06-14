@@ -89,16 +89,28 @@ namespace tslib {
     template<typename ReturnType, template<class> class F>
     const TSeries<TDATE,ReturnType,TSDIM,TSDATABACKEND,DatePolicy> transform() const;
 
+    template<typename ReturnType, template<class> class F>
+    const TSeries<TDATE,ReturnType,TSDIM,TSDATABACKEND,DatePolicy> transform_OMP() const;
+
     template<typename ReturnType, template<class> class F, typename T>
     const TSeries<TDATE,ReturnType,TSDIM,TSDATABACKEND,DatePolicy> transform_1arg(T arg1) const;
+
+    template<typename ReturnType, template<class> class F, typename T>
+    const TSeries<TDATE,ReturnType,TSDIM,TSDATABACKEND,DatePolicy> transform_1arg_OMP(T arg1) const;
 
     // frequency conversion (only highfreq to lowfreq conversion)
     template<template<class, template<typename> class> class PFUNC>
     const TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy> freq(const int n = 1) const;
 
+    template<template<class, template<typename> class> class PFUNC>
+    const TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy> freq_OMP(const int n = 1) const;
+
     // subsets
     template<typename T>
     const TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy> row_subset(T beg, T end) const;
+
+    template<typename T>
+    const TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy> row_subset_OMP(T beg, T end) const;
 
     // pad
     template<typename T>
@@ -542,6 +554,29 @@ namespace tslib {
   }
 
   template<typename TDATE, typename TDATA, typename TSDIM, template<typename,typename,typename> class TSDATABACKEND, template<typename> class DatePolicy>
+  template<typename ReturnType, template<class> class F>
+  const TSeries<TDATE,ReturnType,TSDIM,TSDATABACKEND,DatePolicy> TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy>::transform_OMP() const {
+
+    // allocate new answer
+    TSeries<TDATE,ReturnType,TSDIM,TSDATABACKEND,DatePolicy> ans(nrow(), ncol());
+
+    // copy over dates
+    std::copy(getDates(),getDates()+nrow(),ans.getDates());
+
+    // set new colnames
+    ans.setColnames(getColnames());
+
+    ReturnType* ans_data = ans.getData();
+    TDATA* data = getData();
+
+    #pragma omp parallel for
+    for(TSDIM col = 0; col < ncol(); col++) {
+      F<ReturnType>::apply(ans_data + ans.nrow()*col, data + nrow()*col, data + nrow()*(col+1));
+    }
+    return ans;
+  }
+
+  template<typename TDATE, typename TDATA, typename TSDIM, template<typename,typename,typename> class TSDATABACKEND, template<typename> class DatePolicy>
   template<typename ReturnType, template<class> class F, typename T>
   const TSeries<TDATE,ReturnType,TSDIM,TSDATABACKEND,DatePolicy> TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy>::transform_1arg(T arg1) const {
 
@@ -561,6 +596,29 @@ namespace tslib {
       F<ReturnType>::apply(ans_data, data, data + nrow(), arg1);
       ans_data += ans.nrow();
       data += nrow();
+    }
+    return ans;
+  }
+
+  template<typename TDATE, typename TDATA, typename TSDIM, template<typename,typename,typename> class TSDATABACKEND, template<typename> class DatePolicy>
+  template<typename ReturnType, template<class> class F, typename T>
+  const TSeries<TDATE,ReturnType,TSDIM,TSDATABACKEND,DatePolicy> TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy>::transform_1arg_OMP(T arg1) const {
+
+    // allocate new answer
+    TSeries<TDATE,ReturnType,TSDIM,TSDATABACKEND,DatePolicy> ans(nrow(), ncol());
+
+    // copy over dates
+    std::copy(getDates(),getDates()+nrow(),ans.getDates());
+
+    // set new colnames
+    ans.setColnames(getColnames());
+
+    ReturnType* ans_data = ans.getData();
+    TDATA* data = getData();
+
+    #pragma omp parallel for
+    for(TSDIM col = 0; col < ncol(); col++) {
+      F<ReturnType>::apply(ans_data + ans.row()*col, data + nrow()*col, data + nrow()*(col+1), arg1);
     }
     return ans;
   }
@@ -593,6 +651,47 @@ namespace tslib {
       ++beg;
       ++ans_index;
     }
+    return ans;
+  }
+
+  // this is for a positive row subset (positive and negative rowsets cannot mix)
+  template<typename TDATE, typename TDATA, typename TSDIM, template<typename,typename,typename> class TSDATABACKEND, template<typename> class DatePolicy>
+  template<typename T>
+  const TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy> TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy>::row_subset_OMP(T beg, T end) const {
+    TSDIM new_nrow = static_cast<TSDIM>( std::distance(beg,end) );
+    TSDIM new_ncol = ncol();
+
+    // allocate new answer
+    TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy> ans(new_nrow, new_ncol);
+
+    // copy over colnames
+    ans.setColnames(getColnames());
+
+    TDATE* dates = getDates();
+    TDATA* data = getData();
+    TDATE* ans_dates = ans.getDates();
+    TDATA* ans_data = ans.getData();
+
+    TSDIM ans_index = 0;
+
+    #pragma omp parallel
+    {
+      #pragma omp single no wait
+      {
+        while(beg!=end) {
+          #pragma omp task firstprivate(beg, ans_index)
+          {
+            ans_dates[ans_index] = dates[*beg];
+            for(TSDIM c = 0; c < ncol(); c++) {
+              ans_data[ans.offset(ans_index,c)] = data[offset(*beg,c)];
+            }
+          }
+          ++beg;
+          ++ans_index;
+        }
+      }
+    }
+
     return ans;
   }
 
@@ -641,6 +740,26 @@ namespace tslib {
     partitions.resize(nrow());
     // transform dates
     TDATE* dts = getDates();
+    for(TSDIM row = 0; row < nrow(); row++) {
+      partitions[row] = PFUNC<TDATE, DatePolicy>()(dts[row],n);
+    }
+    //std::transform(getDates(), getDates() + nrow(), partitions.begin(), std::bind2nd(PFUNC<TDATE, DatePolicy>, n));
+    // vector for selected rows
+    std::vector<TSDIM> ans_rows;
+    breaks(partitions.begin(),partitions.end(),std::back_inserter(ans_rows));
+    return row_subset(ans_rows.begin(), ans_rows.end());
+  }
+
+  template<typename TDATE, typename TDATA, typename TSDIM, template<typename,typename,typename> class TSDATABACKEND, template<typename> class DatePolicy>
+  template<template<class, template<typename> class> class PFUNC>
+  const TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy> TSeries<TDATE,TDATA,TSDIM,TSDATABACKEND,DatePolicy>::freq_OMP(const int n) const {
+
+    // pre-allocate vector for transformed dates
+    typename std::vector<TDATE> partitions;
+    partitions.resize(nrow());
+    // transform dates
+    TDATE* dts = getDates();
+    #pragma omp parallel for
     for(TSDIM row = 0; row < nrow(); row++) {
       partitions[row] = PFUNC<TDATE, DatePolicy>()(dts[row],n);
     }
